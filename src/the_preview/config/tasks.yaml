@@ -74,9 +74,10 @@ manager_task:
     - Return results as markdown.
 
     **Image requirement:**  
-    Add the image URL returned by the image generation tool at the end of the response, in this exact format:  
+    - Add the image URL at the end of the response, in this exact format:  
     <IMAGE:IMAGE_URL>
-    Do not include any description, dialog, or headers for the image.
+    - Do not include any description, dialog, or headers for the image.
+    - Do not alter the image url at all, include it EXACTLY as received.
 
   agent: manager
 

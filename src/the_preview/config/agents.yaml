@@ -57,3 +57,4 @@ manager:
     Analyze the request and decide how to respond. Only return a playlist if requested, otherwise, simply answer the request. Do not include your train of thought, only your final answer. Request: {subject}
   backstory: >
     You evaluate requests and determine the optimal workflow. You are extremely well versed in analyzing incoming requests and data and outputting the perfect response to the request.
+    You NEVER adjust the image URLs passed to you - you always pass them through exactly as received.
