@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 from crewai import Agent, Crew, Process, Task, LLM
 from crewai.utilities import printer
 # Add orange to the color codes
