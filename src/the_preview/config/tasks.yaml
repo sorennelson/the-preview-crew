@@ -1,0 +1,91 @@
+web_scrape_task:  
+  name: Searching the web
+  description: >
+    Extract information for '{subject}' within 5 internet searches. If information about a movie playlist is requested, search IMDB for a list of the folloiwng:
+    - Actors,
+    - Description,
+    - Director,
+    - Genre,
+    - Music Composer.
+    If the subject is about a playlist, a spotify playlist generator will follow this task, simply extract the relevant information to help the playlist generator. Be as concise as possible.
+  expected_output: >
+    A list with the relevant information.
+  agent: researcher
+
+
+spotify_scrape_task:
+  name: Searching Spotify
+  description: >
+    Search Spotify for music tracks, albums, artists, and podcasts that are highly relevant to '{subject}' and assemble a playlist if the user has requested one. For each item you find, include the exact Spotify URL in markdown format as a clickable link, using only real, verifiable Spotify links and never making one up or altering an ID. Give preference to the most popular or thematically appropriate songs and podcasts. For movies, exclude soundtracks, scores, and instrumentals; instead, choose tracks and podcasts that match the movie’s mood, era, and tone. Format your answer as an ordered markdown list, clearly distinguishing between songs and podcasts, with each item presented as a markdown hyperlink showing the artist, track, show, or episode as appropriate.
+  expected_output: >
+    If a playlist is requested, provide an ordered list of up to 10 songs and 10 podcasts (shows or episodes) relevant to '{subject}'. Do not repeat songs or podcasts, even if they appear on different albums; make the list shorter if necessary.
+
+    For each item, include the artist/creator and an exact Spotify link using the correct ID. Do not make up or alter Spotify links—only use real links as provided. The ID is mandatory.
+
+    Format each entry as a markdown link in one of the following forms:
+        [Artist: Track](https://open.spotify.com/track/<ID>)
+        [Artist](https://open.spotify.com/artist/<ID>)
+        [Artist: Album](https://open.spotify.com/album/<ID>)
+        [Show](https://open.spotify.com/show/<ID>)
+        [Show: Episode](https://open.spotify.com/episode/<ID>)
+
+    Example: [Travis Scott: Butterfly Effect](https://open.spotify.com/track/5Ac0juCmwJuRNiHSOVHG11)
+    Return this in markdown format.
+  agent: playlist_creator
+
+
+generate_image_task:
+  name: Generating an image  
+  description: >
+    Generate an image related to '{subject}'. 
+    Create a detailed prompt that captures the essence, mood, and theme of the subject.
+    If it's a movie, capture its visual style, tone, and key elements.
+    If it's a playlist theme, visualize the mood and energy.
+  expected_output: >
+    CRITICAL: You MUST include the EXACT output from the image generation tool in your response.
+    The output will be in the format <IMAGE:url> - include this EXACTLY as returned.
+    Do not modify, summarize, or paraphrase the tool's output.
+    Example: <IMAGE:https://example.com/image.png>
+  agent: image_generator
+
+
+manager_task:
+  name: Finalizing results
+  description: >
+    Request: {subject}. Return a playlist if requested. All playlists should be made with spotify and have up to 10 songs and 10 podcasts, and 1 image url. For any other requests, answer the user thoughtfully and with respect. Be as helpful to the user as possible without being overly verbose. Do not include your train of thought, only the final answer.
+  expected_output: >
+    Request: {subject}. If a playlist is requested, return the playlist in a presentable markdown format for an end-user. Otherwise, respond concisely to the query. Do not include your train of thought, only the final answer.
+
+    **Playlist formatting requirements:**
+    - Include a unique and witty name based on the request as a header at the top.
+    - Provide up to 10 songs and up to 10 podcasts.
+    - Songs and podcasts should each have their own ordered list, with clear 'Songs' and 'Podcasts' headers.
+    - Use only real Spotify links in the formats below (include the correct ID in every link; do not create or modify links):
+      - [Artist: Track](https://open.spotify.com/track/<ID>)
+      - [Artist](https://open.spotify.com/artist/<ID>)
+      - [Artist: Album](https://open.spotify.com/album/<ID>)
+      - [Show](https://open.spotify.com/show/<ID>)
+      - [Show: Episode](https://open.spotify.com/episode/<ID>)
+    - **Example entries:**
+      - [Nine Inch Nails: Closer](https://open.spotify.com/track/5mc6EyF1OIEOhAkD0Gg9Lc)
+      - [Conversations with Composers: David Robertson on Conducting, Pierre Boulez, and Musical Interpretation](https://open.spotify.com/episode/0ittvsTALuQMtxvVoM4JGO)
+      - [Lex Fridman Podcast: Lex Fridman Podcast](https://open.spotify.com/show/2MAi0BvDc6GTFvKFPXnkCL)
+    - NEVER make up a Spotify link; if you cannot find a real link, omit the item.
+    - Return results as markdown.
+
+    **Image requirement:**  
+    Add the image URL returned by the image generation tool at the end of the response, in this exact format:  
+    <IMAGE:IMAGE_URL>
+    Do not include any description, dialog, or headers for the image.
+
+  agent: manager
+
+
+# reporting_task:
+#   description: >
+#     Review the context you got and expand each topic into a full section for a report.
+#     Make sure the report is detailed and contains any and all relevant information.
+#   expected_output: >
+#     A fully fledged report with the main topics, each with a full section of information.
+#     Formatted as markdown without '```'
+#   agent: reporting_analyst
