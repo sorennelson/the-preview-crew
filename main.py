@@ -376,9 +376,16 @@ async def stream_crew_progress(chat_message: ChatMessage):
 @app.get("/api/history/{session_id}", response_model=ConversationHistory)
 async def get_history(session_id: str):
     """Retrieve conversation history for a session"""
-    if session_id not in sessions:
-        raise HTTPException(status_code=404, detail="Session not found")
+    print(f"=== GET HISTORY CALLED ===", flush=True)
+    print(f"Session ID: {session_id}", flush=True)
+    print(f"Available sessions: {list(sessions.keys())}", flush=True)
+    print(f"Total sessions: {len(sessions)}", flush=True)
     
+    if session_id not in sessions:
+        print(f"❌ Session not found: {session_id}", flush=True)
+        return ConversationHistory(messages=[])
+    
+    print(f"✅ Session found with {len(sessions[session_id]['messages'])} messages", flush=True)
     return ConversationHistory(messages=sessions[session_id]['messages'])
 
 @app.delete("/api/session/{session_id}")
