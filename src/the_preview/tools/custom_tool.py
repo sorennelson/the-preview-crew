@@ -60,7 +60,6 @@ class SpotifyTool(BaseTool):
                 # )
                 return f"Spotify API error: {response}"
 
-            # INSERT_YOUR_CODE
             data = response.json()
             result = []
             key_map = {
