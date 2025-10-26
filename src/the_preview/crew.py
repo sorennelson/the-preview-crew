@@ -10,7 +10,6 @@ if hasattr(printer, '_COLOR_CODES'):
 from crewai.project import CrewBase, agent, crew, task
 from crewai_tools import SerperDevTool, ScrapeWebsiteTool, WebsiteSearchTool
 from .tools.custom_tool import SpotifyTool, SpotifyToolInput, OpenAIImageGenerationTool
-from .spotify_auth import get_spotify_token
 from typing import List
 from datetime import datetime
 from pydantic import BaseModel, Field
@@ -20,8 +19,7 @@ import os
 # you can use the @before_kickoff and @after_kickoff decorators
 # https://docs.crewai.com/concepts/crews#example-crew-class-with-decorators
 
-CLIENT_ID = os.getenv("CLIENT_ID")
-CLIENT_SECRET = os.getenv("CLIENT_SECRET")
+
 RPM = int(os.getenv("RPM"))
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 FILE_PATH = os.getenv("FILE_PATH")
@@ -89,11 +87,11 @@ class ThePreview:
 
     @agent
     def playlist_creator(self) -> Agent:
-        access_token = get_spotify_token(CLIENT_ID, CLIENT_SECRET).get("access_token")
+        # access_token = get_spotify_token(CLIENT_ID, CLIENT_SECRET).get("access_token")
         return Agent(
             config=self.agents_config["playlist_creator"],
             verbose=True,
-            tools=[SpotifyTool(access_token)],
+            tools=[SpotifyTool()],
             max_iter=10,
             max_rpm=RPM,
             llm=llm
