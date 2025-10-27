@@ -32,7 +32,7 @@ def train():
     """
     inputs = {"topic": "AI LLMs", "current_year": str(datetime.now().year)}
     try:
-        ThePreview().crew().train(
+        ThePreview().crew("").train(
             n_iterations=int(sys.argv[1]), filename=sys.argv[2], inputs=inputs
         )
 
@@ -45,7 +45,7 @@ def replay():
     Replay the crew execution from a specific task.
     """
     try:
-        ThePreview().crew().replay(task_id=sys.argv[1])
+        ThePreview().crew("").replay(task_id=sys.argv[1])
 
     except Exception as e:
         raise Exception(f"An error occurred while replaying the crew: {e}")
@@ -58,7 +58,7 @@ def test():
     inputs = {"topic": "AI LLMs", "current_year": str(datetime.now().year)}
 
     try:
-        ThePreview().crew().test(
+        ThePreview().crew("").test(
             n_iterations=int(sys.argv[1]), eval_llm=sys.argv[2], inputs=inputs
         )
 

@@ -7,9 +7,11 @@ from crewai.utilities import printer
 if hasattr(printer, '_COLOR_CODES'):
     printer._COLOR_CODES['orange'] = '\033[38;5;208m'
 
-from crewai.project import CrewBase, agent, crew, task
+from crewai.project import CrewBase, agent, crew, task, tool
 from crewai_tools import SerperDevTool, ScrapeWebsiteTool, WebsiteSearchTool
-from .tools.custom_tool import SpotifyTool, SpotifyToolInput, OpenAIImageGenerationTool
+from .tools.spotify_tool import SpotifyTool
+from .tools.image_gen_tool import OpenAIImageGenerationTool
+from .tools.spotify_preferences_tool import SpotifyTasteProfileTool, SpotifyUserDataToolInput
 from typing import List
 from datetime import datetime
 from pydantic import BaseModel, Field
@@ -34,11 +36,11 @@ llm = LLM(
 class ThePreview:
     """ThePreview crew with chat capability"""
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, spotify_token):
         # Queue for streaming updates
         self.stream_queue = None
         self._event_loop = None
+        self.spotify_token = spotify_token
 
     def set_event_loop(self, loop):
         """Set the event loop for async usage (for streaming support)"""
@@ -87,15 +89,20 @@ class ThePreview:
 
     @agent
     def playlist_creator(self) -> Agent:
-        # access_token = get_spotify_token(CLIENT_ID, CLIENT_SECRET).get("access_token")
         return Agent(
             config=self.agents_config["playlist_creator"],
             verbose=True,
-            tools=[SpotifyTool()],
+            tools=[SpotifyTool(), SpotifyTasteProfileTool(self.spotify_token)],
             max_iter=10,
             max_rpm=RPM,
             llm=llm
         )
+
+    # # Create a separate method to add the taste profile tool with token
+    # def _add_spotify_taste_tool(self, agent: Agent, spotify_token: str):
+    #     """Add the Spotify taste profile tool to an agent"""
+    #     agent.tools.append(SpotifyTasteProfileTool(spotify_token))
+    #     return agent
 
     @agent
     def image_generator(self) -> Agent:
@@ -191,10 +198,13 @@ class ThePreview:
     @crew
     def crew(self) -> Crew:
         """Creates the standard playlist/research crew"""
+        playlist_agent = self.playlist_creator()
+        # playlist_agent = self._add_spotify_taste_tool(playlist_agent, spotify_token)
+        # print(f"Playlist creator agent tools: {[tool.name for tool in playlist_agent.tools]}")
 
         return Crew(
             agents=[
-              self.researcher(), self.playlist_creator(), self.image_generator(), self.manager()
+              self.researcher(), playlist_agent, self.image_generator(), self.manager()
             ], 
             tasks=[
               self.web_scrape_task(), self.spotify_scrape_task(), self.generate_image_task(), self.manager_task()
@@ -207,10 +217,13 @@ class ThePreview:
             output_log_file="logs/playlist_crew.md"
         )
 
-    def chat_crew(self, session_id: str) -> Crew:
+    def chat_crew(self) -> Crew:
         """Creates a lightweight crew for chat interactions"""
+        playlist_agent = self.playlist_creator()
+        # playlist_agent = self._add_spotify_taste_tool(playlist_agent, spotify_token)
+
         return Crew(
-            agents=[self.chat_agent(), self.researcher(), self.playlist_creator(), self.image_generator()],
+            agents=[self.chat_agent(), self.researcher(), playlist_agent, self.image_generator()],
             tasks=[],  # Tasks will be added dynamically
             process=Process.sequential,
             verbose=True,

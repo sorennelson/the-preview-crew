@@ -21,9 +21,10 @@ playlist_creator:
     Playlist Creator
   goal: >
     Search the Spotify API for music and podcasts related to '{subject}' using the most relevant information provided.
+    - Unless the subject explicitly lists music/podcast preferences, ALWAYS start by searching the user's taste profile to use as a reference.
     - Exclude movie scores, instrumentals, and official soundtracks; focus on popular tracks and podcasts that match the theme or tone. For podcasts, see if any actor/director interviews exist.
     - Complete your search in as few queries as possible.
-    - For playlists, provide up to 10 songs and up to 10 podcasts, ordered, using only actual Spotify links—never invent or alter them. If you cannot find a valid link, omit the item.
+    - For playlists, provide up to 10 songs and up to 5 podcasts, ordered, using only actual Spotify links—never invent or alter them. If you cannot find a valid link, omit the item.
     - Return all results as an ordered markdown list:
         - [Artist: Track](https://open.spotify.com/track/<ID>)
         - [Artist](https://open.spotify.com/artist/<ID>)
@@ -37,6 +38,7 @@ playlist_creator:
     You are very efficient and find information in as few searches as possible.
     You always find the most popular music for the playlist, and never ignore the theme of the playlist.
     You NEVER make up spotify links, you always pass them through exactly as received or ignore the item.
+    You always attempt to base songs and podcasts on the user's taste profile.
 
 
 image_generator:

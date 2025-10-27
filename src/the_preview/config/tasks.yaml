@@ -16,9 +16,9 @@ web_scrape_task:
 spotify_scrape_task:
   name: Searching Spotify
   description: >
-    Search Spotify for music tracks, albums, artists, and podcasts that are highly relevant to '{subject}' and assemble a playlist if the user has requested one. For each item you find, include the exact Spotify URL in markdown format as a clickable link, using only real, verifiable Spotify links and never making one up or altering an ID. Always search Spotify to find the correct link, never create your own. Spotify links can be found under the 'spotify' key. Give preference to the most popular or thematically appropriate songs and podcasts. For movies, exclude soundtracks, scores, and instrumentals; instead, choose tracks and podcasts that match the movie’s mood, era, and tone. Format your answer as an ordered markdown list, clearly distinguishing between songs and podcasts, with each item presented as a markdown hyperlink showing the artist, track, show, or episode as appropriate.
+    Search Spotify for music tracks, albums, artists, and podcasts that are highly relevant to '{subject}' and assemble a playlist if the user has requested one. Unless the subject explicitly lists music/podcast preferences, ALWAYS start by searching the user's taste profile to use as a reference. For each item you find, include the exact Spotify URL in markdown format as a clickable link, using only real, verifiable Spotify links and never making one up or altering an ID. Always search Spotify to find the correct link, never create your own. Spotify links can be found under the 'spotify' key. Give preference to the most popular or thematically appropriate songs and podcasts. For movies, exclude soundtracks, scores, and instrumentals; instead, choose tracks and podcasts that match the movie’s mood, era, and tone. Format your answer as an ordered markdown list, clearly distinguishing between songs and podcasts, with each item presented as a markdown hyperlink showing the artist, track, show, or episode as appropriate.
   expected_output: >
-    If a playlist is requested, provide an ordered list of up to 10 songs and 10 podcasts (shows or episodes) relevant to '{subject}'. Do not repeat songs or podcasts, even if they appear on different albums; make the list shorter if necessary.
+    If a playlist is requested, provide an ordered list of up to 10 songs and 5 podcasts (shows or episodes) relevant to '{subject}'. Do not repeat songs or podcasts, even if they appear on different albums; make the list shorter if necessary.
 
     For each item, include the artist/creator and an exact Spotify link using the correct ID. Do not make up or alter Spotify links—only use real links as provided. The ID is mandatory. Spotify links can be found under the 'spotify' key.
 
@@ -41,6 +41,16 @@ generate_image_task:
     Create a detailed prompt that captures the essence, mood, and theme of the subject.
     If it's a movie, capture its visual style, tone, and key elements.
     If it's a playlist theme, visualize the mood and energy.
+    Prefer not including people in the prompt.
+
+    **Moderation Guidelines:**
+      Before generating your image prompt, ensure that the subject and all prompt content fully adheres to the following safety and moderation guidelines:
+      - Do not include the names or likenesses of real, specific people (living or deceased) in any prompt.
+      - Avoid text that references violence, gore, explicit adult content, self-harm, or any illegal activity.
+      - When in doubt, choose a more abstract, metaphorical, or thematic approach that is visually rich but safe for work.
+      - If the subject includes sensitive or unsafe content, omit or gently reframe that aspect in the prompt to ensure safety and compliance.
+      - Example for movie or playlist involving real people: Instead of using names, reference "a character," "a musician," or describe the style, era, or vibe without personal identifiers.
+      Use this as a safety filter: if a prompt includes real names, violence, or unsafe content, rewrite or abstract it in a way that aligns with the above.
   expected_output: >
     CRITICAL: You MUST include the EXACT output from the image generation tool in your response.
     The output will be in the format <IMAGE:url> - include this EXACTLY as returned.
@@ -52,13 +62,13 @@ generate_image_task:
 manager_task:
   name: Finalizing results
   description: >
-    Request: {subject}. Return a playlist if requested. All playlists should be made with spotify and have up to 10 songs and 10 podcasts, and 1 image url. For any other requests, answer the user thoughtfully and with respect. Be as helpful to the user as possible without being overly verbose. Do not include your train of thought, only the final answer.
+    Request: {subject}. Return a playlist if requested. All playlists should be made with spotify and have up to 10 songs and 5 podcasts, and 1 image url. For any other requests, answer the user thoughtfully and with respect. Be as helpful to the user as possible without being overly verbose. Do not include your train of thought, only the final answer.
   expected_output: >
     Request: {subject}. If a playlist is requested, return the playlist in a presentable markdown format for an end-user. Otherwise, respond concisely to the query. Do not include your train of thought, only the final answer.
 
     **Playlist formatting requirements:**
     - Include a unique and witty name based on the request as a header at the top.
-    - Provide up to 10 songs and up to 10 podcasts.
+    - Provide up to 10 songs and up to 5 podcasts.
     - Songs and podcasts should each have their own ordered list, with clear 'Songs' and 'Podcasts' headers.
     - Use only real Spotify links in the formats below (include the correct ID in every link; do not create or modify links):
       - [Artist: Track](https://open.spotify.com/track/<ID>)

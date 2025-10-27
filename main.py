@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 from pathlib import Path
+import redis.asyncio as redis
 import uuid, os, json, asyncio, re
 
 app = FastAPI()
@@ -25,12 +26,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Store conversation sessions (use Redis in production)
-sessions: Dict[str, Dict] = {}
+# sessions: Dict[str, Dict] = {}
 SESSION_TIMEOUT = timedelta(hours=1)
+redis_client = redis.from_url(
+    os.getenv("REDIS_URL", "redis://localhost:6379"), decode_responses=True
+)
 
 # Initialize crew instance
-crew_instance = ThePreview()
+# crew_instance = ThePreview()
 
 test_result = """
 # The Matrix:
@@ -66,6 +69,7 @@ test_result = """
 class ChatMessage(BaseModel):
     message: str
     session_id: Optional[str] = None
+    spotify_user_token: Optional[str] = None
     mode: str = "auto"  # "auto", "chat", "playlist"
     image_url: Optional[str] = None  # For image inputs
     stream: bool = False  # Enable streaming
@@ -80,43 +84,85 @@ class ChatResponse(BaseModel):
 class ConversationHistory(BaseModel):
     messages: List[Dict[str, Any]]
 
-def cleanup_old_sessions():
-    """Remove sessions older than timeout"""
-    current_time = datetime.now()
-    expired = [
-        sid for sid, data in sessions.items()
-        if current_time - data['last_active'] > SESSION_TIMEOUT
-    ]
-    for sid in expired:
-        del sessions[sid]
+# ----- REDIS -----
 
-def get_or_create_session(session_id: Optional[str] = None) -> str:
-    """Get existing session or create new one"""
-    cleanup_old_sessions()
-    
-    # If session_id is provided, try to use it
-    if session_id:
-        if session_id in sessions:
-            # Existing session - update last active time
-            sessions[session_id]['last_active'] = datetime.now()
-            return session_id
-        else:
-            # Session ID provided but doesn't exist - create with that ID
-            sessions[session_id] = {
-                'created': datetime.now(),
-                'last_active': datetime.now(),
-                'messages': []
-            }
-            return session_id
-    
-    # No session_id provided - create new one
-    new_session_id = str(uuid.uuid4())
-    sessions[new_session_id] = {
-        'created': datetime.now(),
-        'last_active': datetime.now(),
-        'messages': []
+async def get_or_create_session(session_id: Optional[str] = None) -> str:
+    """Get existing Redis session or create a new one"""
+    if session_id and await redis_client.exists(session_id):
+        await redis_client.hset(session_id, "last_active", datetime.now().isoformat())
+        await redis_client.expire(session_id, int(SESSION_TIMEOUT.total_seconds()))
+        return session_id
+
+    new_session_id = session_id or str(uuid.uuid4())
+    data = {
+        "created": datetime.now().isoformat(),
+        "last_active": datetime.now().isoformat(),
+        "messages": json.dumps([]),
     }
+    await redis_client.hset(new_session_id, mapping=data)
+    await redis_client.expire(new_session_id, int(SESSION_TIMEOUT.total_seconds()))
     return new_session_id
+
+async def store_message(session_id: str, role: str, content: str, mode: str, images: Optional[List[str]] = None):
+    """Store a message in Redis"""
+    session = await redis_client.hgetall(session_id)
+    messages = json.loads(session.get("messages", "[]"))
+    msg = {
+        "role": role,
+        "content": content,
+        "mode": mode,
+        "timestamp": datetime.now().isoformat(),
+    }
+    if images:
+        msg["images"] = images
+    messages.append(msg)
+    await redis_client.hset(session_id, mapping={
+        "messages": json.dumps(messages),
+        "last_active": datetime.now().isoformat()
+    })
+    await redis_client.expire(session_id, int(SESSION_TIMEOUT.total_seconds()))
+
+
+async def update_session_token(session_id: str, spotify_user_token: str):
+    """Update the Spotify user token in the session stored in Redis."""
+    session = await redis_client.hgetall(session_id)
+    if not session: 
+      return
+    await redis_client.hset(session_id, mapping={
+        "spotify_user_token": spotify_user_token,
+    })
+
+
+
+async def get_session_messages(session_id: str) -> List[Dict[str, Any]]:
+    """Retrieve messages for a session"""
+    session = await redis_client.hgetall(session_id)
+    return json.loads(session.get("messages", "[]")) if session else []
+
+
+async def delete_session(session_id: str):
+    """Delete a session"""
+    await redis_client.delete(session_id)
+
+
+async def pop_message(session_id: str):
+    """Remove the last message from the session's message list in Redis."""
+    session = await redis_client.hgetall(session_id)
+    if not session:
+        return
+    messages = json.loads(session.get("messages", "[]"))
+    if not messages:
+        return
+    last_message = messages.pop()
+    await redis_client.hset(session_id, mapping={
+        "messages": json.dumps(messages),
+        "last_active": datetime.now().isoformat()
+    })
+    await redis_client.expire(session_id, int(SESSION_TIMEOUT.total_seconds()))
+
+
+
+# ----- API -----
 
 def detect_intent(message: str) -> str:
     """Detect if user wants a playlist or just wants to chat"""
@@ -180,22 +226,12 @@ async def chat_endpoint(chat_message: ChatMessage):
         )
 
     try:
-        session_id = get_or_create_session(chat_message.session_id)
-        session = sessions[session_id]
+        session_id = await get_or_create_session(chat_message.session_id)
+        # await update_session_token(
+        #   chat_message.session_id, chat_message.spotify_user_token
+        # )
         
         print(f"📝 Session ID: {session_id}")
-        print(f"📊 Current message count: {len(session['messages'])}")
-        
-        # Store user message with optional image
-        user_msg = {
-            'role': 'user',
-            'content': chat_message.message,
-            'timestamp': datetime.now().isoformat()
-        }
-        if chat_message.image_url:
-            user_msg['image_url'] = chat_message.image_url
-        
-        session['messages'].append(user_msg)
         
         # Determine mode
         if chat_message.mode == "auto":
@@ -203,12 +239,18 @@ async def chat_endpoint(chat_message: ChatMessage):
         else:
             mode = chat_message.mode
         
+        # await store_message(
+        #   session_id, "user", chat_message.message, mode, 
+        # )
+        messages = await get_session_messages(session_id)
+        
+        print(f"✅ Total messages: {len(messages)}")
         print(f"🎯 Mode detected: {mode}")
         
         # Build chat history context (exclude current message)
         chat_history = "\n".join([
             f"{msg['role'].title()}: {msg['content']}"
-            for msg in session['messages'][:-1]
+            for msg in messages
         ])
         
         print(f"💬 Chat history length: {len(chat_history)} chars")
@@ -220,9 +262,10 @@ async def chat_endpoint(chat_message: ChatMessage):
         }
         if chat_message.image_url:
             crew_inputs['image_url'] = chat_message.image_url
+
+        crew_instance = ThePreview(chat_message.spotify_user_token)
         
         # Execute appropriate crew workflow
-        images = []
         if mode == "playlist":
             # Run full playlist crew
             result = crew_instance.crew().kickoff(inputs=crew_inputs)
@@ -230,7 +273,7 @@ async def chat_endpoint(chat_message: ChatMessage):
             response, images = extract_images_from_result(result)
         else:
             # Run lightweight chat crew
-            chat_crew = crew_instance.chat_crew(session_id)
+            chat_crew = crew_instance.chat_crew()
             chat_task = crew_instance.create_chat_task(
                 message=chat_message.message,
                 session_id=session_id,
@@ -241,18 +284,11 @@ async def chat_endpoint(chat_message: ChatMessage):
             response = str(result.raw) if hasattr(result, 'raw') else str(result)
             response, images = extract_images_from_result(result)
         
-        # Store assistant response with images
-        assistant_msg = {
-            'role': 'assistant',
-            'content': response,
-            'timestamp': datetime.now().isoformat()
-        }
-        if images:
-            assistant_msg['images'] = images
+        await store_message(session_id, "user", chat_message.message, mode)
+        await store_message(session_id, "llm", response, mode, images=images)
+        messages = await get_session_messages(session_id)
         
-        session['messages'].append(assistant_msg)
-        
-        print(f"✅ Total messages now: {len(session['messages'])}")
+        print(f"✅ Total messages now: {len(messages)}")
         print(f"🖼️  Images in response: {len(images)}")
         
         return ChatResponse(
@@ -264,28 +300,22 @@ async def chat_endpoint(chat_message: ChatMessage):
         )
         
     except Exception as e:
-        if session['messages'] and session['messages'][-1]['role'] == 'user':
-            session['messages'].pop()
         print(f"❌ Error: {str(e)}")
+        # await pop_message(session_id)
         raise HTTPException(status_code=500, detail=str(e))
 
 
 async def stream_crew_progress(chat_message: ChatMessage):
     """Stream CrewAI progress updates as SSE with async queue."""
     
-    session_id = get_or_create_session(chat_message.session_id)
-    session = sessions[session_id]
+    session_id = await get_or_create_session(chat_message.session_id)
+    # await update_session_token(
+    #   chat_message.session_id, chat_message.spotify_user_token
+    # )
+    crew_instance = ThePreview(chat_message.spotify_user_token)
 
     main_loop = asyncio.get_running_loop()
     crew_instance.set_event_loop(main_loop)
-
-    # Store user message
-    user_msg = {
-        'role': 'user',
-        'content': chat_message.message,
-        'timestamp': datetime.now().isoformat()
-    }
-    session['messages'].append(user_msg)
 
     # Send initial connected message
     yield f"data: {json.dumps({'type': 'connected', 'session_id': session_id})}\n\n"
@@ -294,6 +324,11 @@ async def stream_crew_progress(chat_message: ChatMessage):
     # Determine mode
     mode = detect_intent(chat_message.message) if chat_message.mode == "auto" else chat_message.mode
     print(f"Intent: {mode}")
+
+    # await store_message(
+    #   session_id, "user", chat_message.message, mode, 
+    # )
+    messages = await get_session_messages(session_id)
 
     yield f"data: {json.dumps({'type': 'mode', 'mode': mode})}\n\n"
     await asyncio.sleep(0)
@@ -312,13 +347,14 @@ async def stream_crew_progress(chat_message: ChatMessage):
 
             print("Running crew")
             if mode == "playlist":
+                print(f"chat_message.spotify_user_token {chat_message.spotify_user_token}")
                 result = crew_instance.crew().kickoff(inputs=crew_inputs)
             else:
                 chat_history = "\n".join(
                     f"{msg['role'].title()}: {msg['content']}" 
-                    for msg in session['messages'][:-1]
+                    for msg in messages
                 )
-                chat_crew = crew_instance.chat_crew(session_id)
+                chat_crew = crew_instance.chat_crew()
                 chat_task = crew_instance.create_chat_task(
                     message=chat_message.message,
                     session_id=session_id,
@@ -347,22 +383,16 @@ async def stream_crew_progress(chat_message: ChatMessage):
         if update['type'] == 'crew_done':
             result = update['result']
             response, images = extract_images_from_result(result)
-
-            # Store assistant message
-            assistant_msg = {
-                'role': 'assistant',
-                'content': response,
-                'timestamp': datetime.now().isoformat(),
-                'mode': mode
-            }
-            if images:
-                assistant_msg['images'] = images
-            session['messages'].append(assistant_msg)
+            
+            await store_message(session_id, "user", chat_message.message, mode)
+            await store_message(session_id, "llm", response, mode, images=images)
 
             yield f"data: {json.dumps({'type': 'complete', 'response': response, 'images': images, 'session_id': session_id, 'timestamp': datetime.now().isoformat()})}\n\n"
             break
 
         elif update['type'] == 'error':
+            # Pop the user message
+            # await pop_message(session_id)
             yield f"data: {json.dumps(update)}\n\n"
             break
 
@@ -376,29 +406,20 @@ async def stream_crew_progress(chat_message: ChatMessage):
 @app.get("/api/history/{session_id}", response_model=ConversationHistory)
 async def get_history(session_id: str):
     """Retrieve conversation history for a session"""
-    print(f"=== GET HISTORY CALLED ===", flush=True)
-    print(f"Session ID: {session_id}", flush=True)
-    print(f"Available sessions: {list(sessions.keys())}", flush=True)
-    print(f"Total sessions: {len(sessions)}", flush=True)
-    
-    if session_id not in sessions:
-        print(f"❌ Session not found: {session_id}", flush=True)
-        return ConversationHistory(messages=[])
-    
-    print(f"✅ Session found with {len(sessions[session_id]['messages'])} messages", flush=True)
-    return ConversationHistory(messages=sessions[session_id]['messages'])
+    messages = await get_session_messages(session_id)
+    return ConversationHistory(messages=messages)
 
 @app.delete("/api/session/{session_id}")
 async def clear_session(session_id: str):
     """Clear a conversation session"""
-    if session_id in sessions:
-        del sessions[session_id]
+    await delete_session(session_id)
     return {"message": "Session cleared"}
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
-    return {"status": "healthy", "active_sessions": len(sessions)}
+    keys = await redis_client.keys("*")
+    return {"status": "healthy", "active_sessions": len(keys)}
 
 if __name__ == "__main__":
     import uvicorn
