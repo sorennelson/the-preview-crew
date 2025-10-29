@@ -32,9 +32,6 @@ redis_client = redis.from_url(
     os.getenv("REDIS_URL", "redis://localhost:6379"), decode_responses=True
 )
 
-# Initialize crew instance
-# crew_instance = ThePreview()
-
 test_result = """
 # The Matrix:
 
@@ -122,7 +119,6 @@ async def store_message(session_id: str, role: str, content: str, mode: str, ima
     })
     await redis_client.expire(session_id, int(SESSION_TIMEOUT.total_seconds()))
 
-
 async def update_session_token(session_id: str, spotify_user_token: str):
     """Update the Spotify user token in the session stored in Redis."""
     session = await redis_client.hgetall(session_id)
@@ -132,34 +128,14 @@ async def update_session_token(session_id: str, spotify_user_token: str):
         "spotify_user_token": spotify_user_token,
     })
 
-
-
 async def get_session_messages(session_id: str) -> List[Dict[str, Any]]:
     """Retrieve messages for a session"""
     session = await redis_client.hgetall(session_id)
     return json.loads(session.get("messages", "[]")) if session else []
 
-
 async def delete_session(session_id: str):
     """Delete a session"""
     await redis_client.delete(session_id)
-
-
-async def pop_message(session_id: str):
-    """Remove the last message from the session's message list in Redis."""
-    session = await redis_client.hgetall(session_id)
-    if not session:
-        return
-    messages = json.loads(session.get("messages", "[]"))
-    if not messages:
-        return
-    last_message = messages.pop()
-    await redis_client.hset(session_id, mapping={
-        "messages": json.dumps(messages),
-        "last_active": datetime.now().isoformat()
-    })
-    await redis_client.expire(session_id, int(SESSION_TIMEOUT.total_seconds()))
-
 
 
 # ----- API -----
@@ -169,7 +145,8 @@ def detect_intent(message: str) -> str:
     playlist_keywords = [
         'create playlist', 'make playlist', 'create a playlist', 'make a playlist',
         'make me a playlist', 'create for me a playlist', 'create me a playlist'
-        'songs for', 'music for', 'podcasts for', 'recommendations'
+        'songs for', 'music for', 'podcasts for', 'recommendations', "playlist for",
+        "playlist of", "playlist that"
     ]
     
     message_lower = message.lower()
@@ -227,9 +204,6 @@ async def chat_endpoint(chat_message: ChatMessage):
 
     try:
         session_id = await get_or_create_session(chat_message.session_id)
-        # await update_session_token(
-        #   chat_message.session_id, chat_message.spotify_user_token
-        # )
         
         print(f"📝 Session ID: {session_id}")
         
@@ -239,9 +213,6 @@ async def chat_endpoint(chat_message: ChatMessage):
         else:
             mode = chat_message.mode
         
-        # await store_message(
-        #   session_id, "user", chat_message.message, mode, 
-        # )
         messages = await get_session_messages(session_id)
         
         print(f"✅ Total messages: {len(messages)}")
@@ -301,7 +272,6 @@ async def chat_endpoint(chat_message: ChatMessage):
         
     except Exception as e:
         print(f"❌ Error: {str(e)}")
-        # await pop_message(session_id)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -309,9 +279,6 @@ async def stream_crew_progress(chat_message: ChatMessage):
     """Stream CrewAI progress updates as SSE with async queue."""
     
     session_id = await get_or_create_session(chat_message.session_id)
-    # await update_session_token(
-    #   chat_message.session_id, chat_message.spotify_user_token
-    # )
     crew_instance = ThePreview(chat_message.spotify_user_token)
 
     main_loop = asyncio.get_running_loop()
@@ -325,9 +292,6 @@ async def stream_crew_progress(chat_message: ChatMessage):
     mode = detect_intent(chat_message.message) if chat_message.mode == "auto" else chat_message.mode
     print(f"Intent: {mode}")
 
-    # await store_message(
-    #   session_id, "user", chat_message.message, mode, 
-    # )
     messages = await get_session_messages(session_id)
 
     yield f"data: {json.dumps({'type': 'mode', 'mode': mode})}\n\n"
@@ -391,8 +355,6 @@ async def stream_crew_progress(chat_message: ChatMessage):
             break
 
         elif update['type'] == 'error':
-            # Pop the user message
-            # await pop_message(session_id)
             yield f"data: {json.dumps(update)}\n\n"
             break
 

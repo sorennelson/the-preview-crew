@@ -98,12 +98,6 @@ class ThePreview:
             llm=llm
         )
 
-    # # Create a separate method to add the taste profile tool with token
-    # def _add_spotify_taste_tool(self, agent: Agent, spotify_token: str):
-    #     """Add the Spotify taste profile tool to an agent"""
-    #     agent.tools.append(SpotifyTasteProfileTool(spotify_token))
-    #     return agent
-
     @agent
     def image_generator(self) -> Agent:
         return Agent(
@@ -198,13 +192,9 @@ class ThePreview:
     @crew
     def crew(self) -> Crew:
         """Creates the standard playlist/research crew"""
-        playlist_agent = self.playlist_creator()
-        # playlist_agent = self._add_spotify_taste_tool(playlist_agent, spotify_token)
-        # print(f"Playlist creator agent tools: {[tool.name for tool in playlist_agent.tools]}")
-
         return Crew(
             agents=[
-              self.researcher(), playlist_agent, self.image_generator(), self.manager()
+              self.researcher(), self.playlist_creator(), self.image_generator(), self.manager()
             ], 
             tasks=[
               self.web_scrape_task(), self.spotify_scrape_task(), self.generate_image_task(), self.manager_task()
@@ -219,11 +209,8 @@ class ThePreview:
 
     def chat_crew(self) -> Crew:
         """Creates a lightweight crew for chat interactions"""
-        playlist_agent = self.playlist_creator()
-        # playlist_agent = self._add_spotify_taste_tool(playlist_agent, spotify_token)
-
         return Crew(
-            agents=[self.chat_agent(), self.researcher(), playlist_agent, self.image_generator()],
+            agents=[self.chat_agent(), self.researcher(), self.playlist_creator(), self.image_generator()],
             tasks=[],  # Tasks will be added dynamically
             process=Process.sequential,
             verbose=True,
