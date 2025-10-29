@@ -152,6 +152,15 @@ def detect_intent(message: str) -> str:
     message_lower = message.lower()
     if any(keyword in message_lower for keyword in playlist_keywords):
         return "playlist"
+
+    # Add an additional regex-based check for intent detection
+    # Regex should capture phrases relating to "make/create" and "list/soundtrack/playlist"
+    playlist_intent_pattern = re.compile(
+        r"\b(make|create|build)\b.*\b(list|soundtrack|playlist)\b|\b(list|soundtrack|playlist)\b.*\b(make|create|build)\b",
+        re.IGNORECASE
+    )
+    if playlist_intent_pattern.search(message):
+        return "playlist"
     return "chat"
 
 def extract_images_from_result(result: any) -> tuple[str, List[str]]:
