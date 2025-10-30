@@ -66,7 +66,7 @@ class SpotifyTool(BaseTool):
 
             url = "https://api.spotify.com/v1/search"
             headers = {"Authorization": f"Bearer {spotify_token}"}
-            limit = 5
+            limit = 10
             params = {"q": query, "type": search_type, "limit": limit, "market": "US"}
             response = requests.get(url, headers=headers, params=params)
 
@@ -92,6 +92,9 @@ class SpotifyTool(BaseTool):
             items = data.get(root_key, {}).get("items", [])
 
             for item in items:
+                if item.get("explicit"):
+                  continue
+
                 # Copy all top-level fields except available_markets and images
                 entry = {k: v for k, v in item.items() if k not in ("available_markets", "images", "html_description", "album")}
 
