@@ -92,7 +92,7 @@ class SpotifyTool(BaseTool):
             items = data.get(root_key, {}).get("items", [])
 
             for item in items:
-                if item.get("explicit"):
+                if search_type == "track" and item.get("explicit"):
                   continue
 
                 # Copy all top-level fields except available_markets and images
