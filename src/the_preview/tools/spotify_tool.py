@@ -66,7 +66,7 @@ class SpotifyTool(BaseTool):
 
             url = "https://api.spotify.com/v1/search"
             headers = {"Authorization": f"Bearer {spotify_token}"}
-            limit = 10
+            limit = 5
             params = {"q": query, "type": search_type, "limit": limit, "market": "US"}
             response = requests.get(url, headers=headers, params=params)
 
