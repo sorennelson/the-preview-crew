@@ -146,7 +146,7 @@ def detect_intent(message: str) -> str:
         'create playlist', 'make playlist', 'create a playlist', 'make a playlist',
         'make me a playlist', 'create for me a playlist', 'create me a playlist'
         'songs for', 'music for', 'podcasts for', 'recommendations', "playlist for",
-        "playlist of", "playlist that"
+        "playlist of", "playlist that", "playlist to"
     ]
     
     message_lower = message.lower()
