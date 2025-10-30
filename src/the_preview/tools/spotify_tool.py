@@ -92,8 +92,8 @@ class SpotifyTool(BaseTool):
             items = data.get(root_key, {}).get("items", [])
 
             for item in items:
-                if search_type == "track" and item.get("explicit"):
-                  continue
+                # if search_type == "track" and item.get("explicit"):
+                #   continue
 
                 # Copy all top-level fields except available_markets and images
                 entry = {k: v for k, v in item.items() if k not in ("available_markets", "images", "html_description", "album")}
