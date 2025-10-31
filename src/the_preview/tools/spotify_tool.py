@@ -31,7 +31,13 @@ class SpotifyToolInput(BaseModel):
     query: str = Field(..., description="Spotify search query.")
     search_type: str = Field(
         default=SpotifySearchType.track,
-        description="One of ['track', 'album', 'artist', 'genre', 'playlist', 'episode', 'show']. Type of Spotify search query.",
+        description="One of ['track', 'album', 'artist', 'genre', 'playlist', 'episode', 'show']. Type of Spotify search query. Type 'episode' are podcast episodes, type 'show' are podcast shows.",
+    )
+    limit: int = Field(
+        default=5,
+        description="Number of items to return (1-20), default 5.",
+        ge=1,
+        le=20,
     )
 
 
@@ -59,14 +65,13 @@ class SpotifyTool(BaseTool):
         self._token_cache["expires_at"] = now + token_data["expires_in"] - 30
         return self._token_cache["access_token"]
 
-    def _run(self, query: str, search_type: str) -> str:
+    def _run(self, query: str, search_type: str, limit: int) -> str:
         try:
             
             spotify_token = self._get_valid_token()
 
             url = "https://api.spotify.com/v1/search"
             headers = {"Authorization": f"Bearer {spotify_token}"}
-            limit = 5
             params = {"q": query, "type": search_type, "limit": limit, "market": "US"}
             response = requests.get(url, headers=headers, params=params)
 

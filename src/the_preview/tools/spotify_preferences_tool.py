@@ -29,17 +29,17 @@ class SpotifyUserTimeRange(str, Enum):
 class SpotifyUserDataToolInput(BaseModel):
     data_type: str = Field(
         default=SpotifyUserDataType.top_tracks,
-        description="One of ['top_tracks', 'top_artists', 'saved_shows', 'saved_episodes'].",
+        description="One of ['top_tracks', 'top_artists', 'saved_shows', 'saved_episodes']. saved_shows are podcast shows, saved_episodes are podcast episodes.",
     )
     time_range: str = Field(
         default=SpotifyUserTimeRange.medium_term,
-        description="For top items: one of ['short_term', 'medium_term', 'long_term']. Not used for saved_shows.",
+        description="For top items: one of ['short_term', 'medium_term', 'long_term']. Not used for saved_shows or saved_episodes.",
     )
     limit: int = Field(
         default=10,
-        description="Number of items to return (1-50).",
+        description="Number of items to return (1-25), default 10.",
         ge=1,
-        le=10,
+        le=25,
     )
 
 
@@ -131,7 +131,6 @@ class SpotifyTasteProfileTool(BaseTool):
         return result
 
     def _run(self, data_type: str, time_range: str = "medium_term", limit: int = 10) -> str:
-        print(f"Running with spotify token {self.user_token}", flush=True)
         try:
             if data_type == "top_tracks":
                 return self._get_top_items("tracks", time_range, limit)

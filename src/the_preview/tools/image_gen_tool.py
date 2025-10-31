@@ -67,7 +67,7 @@ class OpenAIImageGenerationTool(BaseTool):
             # Create client instance for each request
             client = OpenAI(api_key=self.openai_api_key)
             response = client.images.generate(
-                model="gpt-image-1-mini",
+                model="gpt-image-1", # mini
                 prompt=prompt,
                 size="1024x1024",
                 quality="low",
