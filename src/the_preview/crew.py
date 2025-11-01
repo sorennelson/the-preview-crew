@@ -92,7 +92,12 @@ class ThePreview:
         return Agent(
             config=self.agents_config["playlist_creator"],
             verbose=True,
-            tools=[SpotifyTool(), SpotifyTasteProfileTool(self.spotify_token)],
+            tools=[
+              SerperDevTool(),
+              ScrapeWebsiteTool(),
+              SpotifyTool(), 
+              SpotifyTasteProfileTool(self.spotify_token)
+            ],
             max_iter=10,
             max_rpm=RPM,
             llm=llm
