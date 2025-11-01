@@ -19,10 +19,10 @@ spotify_scrape_task:
   description: >
     Current date: {date}
     Search Spotify for music tracks, albums, artists, and podcasts that are highly relevant to '{subject}' and assemble a playlist if the user has requested one. Adhere to the following rules:
-    - ALWAYS start by searching the user's taste profile to use as a reference. NEVER search for tracks/podcasts before understanding the user's favorites. Unless requested, do not include verbatim items from the users taste profile, just use them as a reference.
+    - ALWAYS start by searching the user's taste profile to use as a reference for both music and podcasts. NEVER search for tracks/podcasts before understanding the user's favorites. Unless requested, do not include verbatim items from the users taste profile, just use them as a reference.
     - For each item you find, include the exact Spotify URL in markdown format as a clickable link, using only real, verifiable Spotify links and never making one up or altering an ID. ALWAYS search Spotify to find the correct link, NEVER create your own. Never directly use the spotify url from the context, always search spotify for the item to verify the url. Omit any items for which you cannot find the spotify url. Spotify links can be found under the 'spotify' key. 
     - ALWAYS respond with podcast episodes unless you can't find one, then respond with podcast shows.
-    - Give preference to songs and podcasts that are the most popular, thematically appropriate, and highly relevant to the users taste profile. Don't always respond with the same items, be creative and find correct items that match the request.
+    - Give preference to songs and podcasts that are the most popular, thematically appropriate, and highly relevant to the users taste profile. Don't always respond with the same items, be unique, creative, and find correct items that match the request.
     - For movie subjects, exclude soundtracks, scores, and instrumentals; instead, choose tracks and podcasts that match the movie’s mood, era, and tone. 
     - Format your answer as an ordered markdown list, clearly distinguishing between songs and podcasts, with each item presented as a markdown hyperlink showing the artist, track, show, or episode as appropriate.
   expected_output: >
@@ -50,6 +50,7 @@ generate_image_task:
     If it's a movie, capture its visual style, tone, and key elements.
     If it's a playlist theme, visualize the mood and energy.
     Prefer not including people in the prompt.
+    Prefer not including text in the prompt.
 
     **Moderation Guidelines:**
       Before generating your image prompt, ensure that the subject and all prompt content fully adheres to the following safety and moderation guidelines:
@@ -71,7 +72,7 @@ manager_task:
   name: Finalizing results
   description: >
     Current date: {date}
-    Request: {subject}. Return a playlist if requested. All playlists should be made with spotify and have up to 10 songs and 5 podcasts, and 1 image url. For any other requests, answer the user thoughtfully and with respect. Be as helpful to the user as possible without being overly verbose. Do not include your train of thought, only the final answer. You may include a synopsis of why the playlist make sense for the request (not individual items, only the entire playlist), if the request is for a playlist. Do not make up or alter a spotify link, podcast, or songs. ALWAYS use what is in context only.
+    Request: {subject}. Return a playlist if requested. All playlists should be made with spotify and have up to 10 songs and 5 podcasts, and 1 image url. For any other requests, answer the user thoughtfully and with respect. Be as helpful to the user as possible without being overly verbose. Do not include your train of thought, only the final answer. You may include a synopsis of why the playlist makes sense for the request (not individual items, only the entire playlist), if the request is for a playlist. Do not make up or alter a spotify link, podcast, or songs. ALWAYS use what is in context only.
   expected_output: >
     Request: {subject}. If a playlist is requested, return the playlist in a presentable markdown format for an end-user. Otherwise, respond concisely to the query. Do not include your train of thought, only the final answer. You may include a synopsis of why the playlist makes sense for the request (not individual items, only the entire playlist), if the request is for a playlist. Do not make up or alter a spotify link, podcast, or songs. ALWAYS use what is in context only.
 

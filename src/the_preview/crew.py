@@ -41,6 +41,7 @@ class ThePreview:
         self.stream_queue = None
         self._event_loop = None
         self.spotify_token = spotify_token
+        self.end_task_names = {}
 
     def set_event_loop(self, loop):
         """Set the event loop for async usage (for streaming support)"""
@@ -63,6 +64,7 @@ class ThePreview:
     def _task_callback(self, task_output):
         """Callback for task completion"""
         task_name = getattr(task_output, 'name', 'Unknown task')[:50]
+        task_name = self.end_task_names.get(task_name, task_name)
         self._stream_update(f"{task_name}", "task_complete")
 
     def _step_callback(self, step_output):
@@ -98,7 +100,7 @@ class ThePreview:
               SpotifyTool(), 
               SpotifyTasteProfileTool(self.spotify_token)
             ],
-            max_iter=10,
+            max_iter=20,
             max_rpm=RPM,
             llm=llm
         )
@@ -198,6 +200,12 @@ class ThePreview:
     @crew
     def crew(self) -> Crew:
         """Creates the standard playlist/research crew"""
+
+        self.end_task_names = {
+          "Searching the web": "Searching Spotify",
+          "Searching Spotify": "Generating an image",
+          "Generating an image": "Finalizing results"
+        }
         return Crew(
             agents=[
               self.researcher(), self.playlist_creator(), self.image_generator(), self.manager()
