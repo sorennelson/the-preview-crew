@@ -146,11 +146,15 @@ def detect_intent(message: str) -> str:
         'create playlist', 'make playlist', 'create a playlist', 'make a playlist',
         'make me a playlist', 'create for me a playlist', 'create me a playlist'
         'songs for', 'music for', 'podcasts for', 'recommendations', "playlist for",
-        "playlist of", "playlist that", "playlist to"
+        "playlist of", "playlist that", "playlist to", "playlist with", 
+        "playlist including"
     ]
     
     message_lower = message.lower()
     if any(keyword in message_lower for keyword in playlist_keywords):
+        return "playlist"
+
+    if message.split()[0].lower() == "playlist":
         return "playlist"
 
     # Add an additional regex-based check for intent detection
@@ -295,20 +299,20 @@ async def stream_crew_progress(chat_message: ChatMessage):
 
     # Send initial connected message
     yield f"data: {json.dumps({'type': 'connected', 'session_id': session_id})}\n\n"
-    await asyncio.sleep(0)  # allow event loop to flush
+    await asyncio.sleep(0)
 
-    # Determine mode
     mode = detect_intent(chat_message.message) if chat_message.mode == "auto" else chat_message.mode
-    print(f"Intent: {mode}")
-
     messages = await get_session_messages(session_id)
 
     yield f"data: {json.dumps({'type': 'mode', 'mode': mode})}\n\n"
     await asyncio.sleep(0)
 
-    # Async queue for streaming updates
     update_queue = asyncio.Queue()
     crew_instance.set_stream_queue(update_queue)
+    
+    # Track completion
+    crew_completed = asyncio.Event()
+    crew_result = {'result': None, 'error': None}
 
     def run_crew():
         """Run CrewAI in background thread and push updates to async queue."""
@@ -318,9 +322,7 @@ async def stream_crew_progress(chat_message: ChatMessage):
                 'date': datetime.now().strftime("%B %d, %Y")
             }
 
-            print("Running crew")
             if mode == "playlist":
-                print(f"chat_message.spotify_user_token {chat_message.spotify_user_token}")
                 result = crew_instance.crew().kickoff(inputs=crew_inputs)
             else:
                 chat_history = "\n".join(
@@ -336,43 +338,71 @@ async def stream_crew_progress(chat_message: ChatMessage):
                 chat_crew.tasks = [chat_task]
                 result = chat_crew.kickoff(inputs=crew_inputs)
 
-            # push completion signal
+            crew_result['result'] = result
             main_loop.call_soon_threadsafe(
                 update_queue.put_nowait, {'type': 'crew_done', 'result': result}
             )
 
         except Exception as e:
+            crew_result['error'] = str(e)
             main_loop.call_soon_threadsafe(
                 update_queue.put_nowait, {'type': 'error', 'error': str(e)}
             )
+        finally:
+            main_loop.call_soon_threadsafe(crew_completed.set)
 
     # Start crew in background
-    main_loop.run_in_executor(None, run_crew)
+    executor_future = main_loop.run_in_executor(None, run_crew)
 
-    # Stream updates
-    while True:
-        update = await update_queue.get()
+    try:
+        # Stream updates
+        while True:
+            update = await update_queue.get()
 
-        if update['type'] == 'crew_done':
-            result = update['result']
-            response, images = extract_images_from_result(result)
-            
-            await store_message(session_id, "user", chat_message.message, mode)
-            await store_message(session_id, "llm", response, mode, images=images)
+            if update['type'] == 'crew_done':
+                result = update['result']
+                response, images = extract_images_from_result(result)
+                
+                await store_message(session_id, "user", chat_message.message, mode)
+                await store_message(session_id, "llm", response, mode, images=images)
 
-            yield f"data: {json.dumps({'type': 'complete', 'response': response, 'images': images, 'session_id': session_id, 'timestamp': datetime.now().isoformat()})}\n\n"
-            break
+                yield f"data: {json.dumps({'type': 'complete', 'response': response, 'images': images, 'session_id': session_id, 'timestamp': datetime.now().isoformat()})}\n\n"
+                
+                crew_instance.set_stream_queue(None)
+                return
 
-        elif update['type'] == 'error':
-            yield f"data: {json.dumps(update)}\n\n"
-            break
+            elif update['type'] == 'error':
+                yield f"data: {json.dumps(update)}\n\n"
+                crew_instance.set_stream_queue(None)
+                return
 
-        else:
-            yield f"data: {json.dumps(update)}\n\n"
-            await asyncio.sleep(0)  # allow loop to flush
+            else:
+                yield f"data: {json.dumps(update)}\n\n"
+                await asyncio.sleep(0)
 
-    # Cleanup
-    crew_instance.set_stream_queue(None)
+    except (asyncio.CancelledError, GeneratorExit):
+        # Client disconnected - create background task to save messages
+        print(f"⚠️ Client disconnected, creating background save task...")
+        
+        async def save_on_disconnect():
+            try:
+                await crew_completed.wait()
+                
+                if crew_result['result'] and not crew_result['error']:
+                    result = crew_result['result']
+                    response, images = extract_images_from_result(result)
+                    
+                    await store_message(session_id, "user", chat_message.message, mode)
+                    await store_message(session_id, "llm", response, mode, images=images)
+                    print(f"✅ Messages saved after disconnect")
+            except Exception as e:
+                print(f"❌ Error saving after disconnect: {e}")
+            finally:
+                crew_instance.set_stream_queue(None)
+        
+        # Create task only on disconnect
+        asyncio.create_task(save_on_disconnect())
+        raise  # Re-raise to properly close the stream
 
 @app.get("/api/history/{session_id}", response_model=ConversationHistory)
 async def get_history(session_id: str):

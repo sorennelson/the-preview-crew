@@ -168,10 +168,11 @@ class ThePreview:
     def create_chat_task(self, message: str, session_id: str, chat_history: str = "") -> Task:
         """Create a task for chat interactions"""
         date = datetime.now().strftime("%B %d, %Y")
-        print(date)
         return Task(
             name="Thinking",
             description=f"""
+            Current date: {date}
+
             Previous conversation:
             {chat_history or "Start of conversation"}
             

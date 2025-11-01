@@ -35,8 +35,8 @@ class SpotifyToolInput(BaseModel):
     )
     limit: int = Field(
         default=5,
-        description="Number of items to return (1-20), default 5.",
-        ge=1,
+        description="Number of items to return (3-20), default 5.",
+        ge=3,
         le=20,
     )
 
