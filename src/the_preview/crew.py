@@ -95,8 +95,8 @@ class ThePreview:
             config=self.agents_config["playlist_creator"],
             verbose=True,
             tools=[
-              SerperDevTool(),
-              ScrapeWebsiteTool(),
+              # SerperDevTool(),
+              # ScrapeWebsiteTool(),
               SpotifyTool(), 
               SpotifyTasteProfileTool(self.spotify_token)
             ],
